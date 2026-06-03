@@ -1,11 +1,15 @@
 # ChatOps Platform
 
-A production-grade microservices chat platform built as a hands-on DevOps learning project.
+A production-grade microservices chat platform built as a hands-on DevOps learning project. Evolves from local Docker Compose to Kubernetes with full GitOps, monitoring, and security.
 
 ## Architecture
+
+```
 Client → Gateway (:8765) → Auth Service (:8001)
-→ Chat Service (:8002)
-PostgreSQL :5432 | Redis :6379
+                          → Chat Service (:8002)
+PostgreSQL :5432
+Redis      :6379
+```
 
 ## Tech Stack
 
@@ -32,25 +36,64 @@ cp .env.example .env
 docker compose up --build
 ```
 
-API: http://localhost:8765
+API: http://localhost:8765  
 Docs: http://localhost:8765/docs
 
 ## API Usage
 
 ```bash
+# Register
 curl -X POST http://localhost:8765/auth/register \
   -H "Content-Type: application/json" \
   -d '{"username":"drago","email":"you@email.com","password":"secret123"}'
 
+# Login and get token
 TOKEN=$(curl -s -X POST http://localhost:8765/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"drago","password":"secret123"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 
+# Send message
 curl -X POST http://localhost:8765/chat/messages \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{"content":"Hello ChatOps!","room":"general"}'
+
+# Get messages
+curl http://localhost:8765/chat/messages \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## CI/CD Pipeline
+
+```
+git push → GitHub Actions
+  ├── Test Gateway Service
+  └── Build and Push to GHCR
+        └── ghcr.io/dpetkow69/chatops-platform/gateway:SHA
+```
+
+## GitOps Flow
+
+```
+git push → ArgoCD detects change → kubectl apply → cluster updated
+```
+
+## Project Structure
+
+```
+chatops-platform/
+├── services/
+│   ├── gateway/
+│   ├── auth-service/
+│   └── chat-service/
+├── infra/terraform/
+├── k8s/base/
+├── helm/chatops/
+├── monitoring/
+├── scripts/
+├── docs/runbooks/
+└── .github/workflows/
 ```
 
 ## Milestones
