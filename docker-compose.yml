@@ -1,0 +1,99 @@
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: chatops-postgres
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB}
+      POSTGRES_USER:     ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout:  5s
+      retries:  5
+    networks:
+      - chatops-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: chatops-redis
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout:  5s
+      retries:  5
+    networks:
+      - chatops-network
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ./services/gateway
+    container_name: chatops-gateway
+    ports:
+      - "8765:8000"
+    environment:
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      CHAT_SERVICE_URL: ${CHAT_SERVICE_URL}
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      chat-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout:  5s
+      retries:  3
+    networks:
+      - chatops-network
+    restart: unless-stopped
+
+  auth-service:
+    build:
+      context: ./services/auth-service
+    container_name: chatops-auth
+    environment:
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8001/health || exit 1"]
+      interval: 15s
+      timeout:  5s
+      retries:  3
+    networks:
+      - chatops-network
+    restart: unless-stopped
+
+  chat-service:
+    build:
+      context: ./services/chat-service
+    container_name: chatops-chat
+    environment:
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8002/health || exit 1"]
+      interval: 15s
+      timeout:  5s
+      retries:  3
+    networks:
+      - chatops-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  chatops-network:
+    driver: bridge
+    name: chatops-network
