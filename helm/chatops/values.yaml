@@ -1,0 +1,26 @@
+replicaCount: 2
+
+gateway:
+  image: chatops/gateway:latest
+  port: 8000
+  imagePullPolicy: Never
+
+authService:
+  image: chatops/auth-service:latest
+  port: 8001
+  imagePullPolicy: Never
+
+chatService:
+  image: chatops/chat-service:latest
+  port: 8002
+  imagePullPolicy: Never
+
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "100m"
+  limits:
+    memory: "256Mi"
+    cpu: "500m"
+
+jwtSecret: "local-dev-secret-min-32-chars-long!!"
